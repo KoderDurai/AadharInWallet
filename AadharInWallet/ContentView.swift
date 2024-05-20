@@ -238,7 +238,7 @@ struct LoadFileView: View {
             }) {
                 Text("Load Zip File")
                     .padding()
-                    .background(Color.gray)
+                    .background(Color.black)
                     .opacity(0.8)
                     .foregroundColor(.white)
                     .cornerRadius(8)
@@ -403,7 +403,7 @@ struct AadharNumberView: View {
             Button(action: {
                 switchReference()
             }) {
-                Text(reference).font(.title2).bold()
+                Text(reference).font(.title2).bold().foregroundStyle(Color.black)
             }
         }
         .onAppear {
