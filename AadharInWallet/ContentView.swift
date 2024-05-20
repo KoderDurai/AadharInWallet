@@ -96,60 +96,92 @@ class SharedDataModel: ObservableObject {
         UserDefaults.standard.set(data.name, forKey: "name")
         UserDefaults.standard.set(data.gender, forKey: "gender")
         UserDefaults.standard.set(data.dob, forKey: "dob")
-        
         UserDefaults.standard.set(data.address.careOf, forKey: "careof")
         UserDefaults.standard.set(data.address.country, forKey: "country")
         UserDefaults.standard.set(data.address.district, forKey: "dist")
-        
         UserDefaults.standard.set(data.address.house, forKey: "house")
         UserDefaults.standard.set(data.address.landmark, forKey: "landmark")
         UserDefaults.standard.set(data.address.locality, forKey: "loc")
-        
         UserDefaults.standard.set(data.address.pincode, forKey: "pc")
         UserDefaults.standard.set(data.address.postOffice, forKey: "po")
         UserDefaults.standard.set(data.address.state, forKey: "state")
-        
         UserDefaults.standard.set(data.address.street, forKey: "street")
         UserDefaults.standard.set(data.address.subDistrict, forKey: "subdist")
-        
-        // Save other fields similarly
         UserDefaults.standard.set(data.encodedImage, forKey: "encodedImage")
         UserDefaults.standard.set(data.aadharNum, forKey: "aadharNum")
     }
 
     func fetchSavedData() {
-        // Fetch data from UserDefaults and populate kycData
-        // Ensure all fields are fetched and assigned
-        let referenceId = UserDefaults.standard.string(forKey:  "referenceId") ?? ""
+        let referenceId = UserDefaults.standard.string(forKey: "referenceId") ?? ""
         let name = UserDefaults.standard.string(forKey: "name") ?? ""
         let gender = UserDefaults.standard.string(forKey: "gender") ?? ""
         let dob = UserDefaults.standard.string(forKey: "dob") ?? ""
-        
         let careof = UserDefaults.standard.string(forKey: "careof") ?? ""
         let country = UserDefaults.standard.string(forKey: "country") ?? ""
         let dist = UserDefaults.standard.string(forKey: "dist") ?? ""
-        
         let house = UserDefaults.standard.string(forKey: "house") ?? ""
         let landmark = UserDefaults.standard.string(forKey: "landmark") ?? ""
         let loc = UserDefaults.standard.string(forKey: "loc") ?? ""
-        
         let pc = UserDefaults.standard.string(forKey: "pc") ?? ""
-        let po = UserDefaults.standard.string(forKey:"po") ?? ""
+        let po = UserDefaults.standard.string(forKey: "po") ?? ""
         let state = UserDefaults.standard.string(forKey: "state") ?? ""
-        
         let street = UserDefaults.standard.string(forKey: "street") ?? ""
         let subdist = UserDefaults.standard.string(forKey: "subdist") ?? ""
-        
         let encodedImage = UserDefaults.standard.string(forKey: "encodedImage") ?? ""
         let aadharNum = UserDefaults.standard.string(forKey: "aadharNum") ?? ""
-        // Fetch other fields similarly
-        self.kycData = KYCData(id: "", referenceId: referenceId, name: name, dob: dob, gender: gender, address: Address(careOf: careof, country: country, district: dist, house: house, landmark: landmark, locality: loc, pincode: pc, postOffice: po, state: state, street: street, subDistrict: subdist, vtc: ""), encodedImage: encodedImage, aadharNum: aadharNum)
+        
+        self.kycData = KYCData(
+            id: referenceId,
+            referenceId: referenceId,
+            name: name,
+            dob: dob,
+            gender: gender,
+            address: Address(
+                careOf: careof,
+                country: country,
+                district: dist,
+                house: house,
+                landmark: landmark,
+                locality: loc,
+                pincode: pc,
+                postOffice: po,
+                state: state,
+                street: street,
+                subDistrict: subdist,
+                vtc: ""
+            ),
+            encodedImage: encodedImage,
+            aadharNum: aadharNum
+        )
     }
-    
+
     func resetData() {
-           self.kycData = KYCData(id: "", referenceId: "", name: "", dob: "", gender: "", address: Address(careOf: "", country: "", district: "", house: "", landmark: "", locality: "", pincode: "", postOffice: "", state: "", street: "", subDistrict: "", vtc: ""), encodedImage: "", aadharNum: "")
-       }
+        self.kycData = KYCData(
+            id: "",
+            referenceId: "",
+            name: "",
+            dob: "",
+            gender: "",
+            address: Address(
+                careOf: "",
+                country: "",
+                district: "",
+                house: "",
+                landmark: "",
+                locality: "",
+                pincode: "",
+                postOffice: "",
+                state: "",
+                street: "",
+                subDistrict: "",
+                vtc: ""
+            ),
+            encodedImage: "",
+            aadharNum: ""
+        )
+    }
 }
+
 
 struct PictureView: View {
     @ObservedObject var sharedDataModel: SharedDataModel
@@ -372,18 +404,19 @@ struct LoadFileView: View {
 
 
 
-struct restView: View {
-    @ObservedObject var sharedDataModel = SharedDataModel()
-    
+struct ResetView: View {
+    @ObservedObject var sharedDataModel: SharedDataModel
+
     var body: some View {
-        Button {
+        Button(action: {
             sharedDataModel.resetData()
-        } label: {
+        }) {
             Text("Reset")
-                .foregroundStyle(Color.black)
+                .foregroundColor(.black)
         }
     }
 }
+
 
 struct AadharNumberView: View {
     @ObservedObject var sharedDataModel: SharedDataModel
@@ -400,19 +433,20 @@ struct AadharNumberView: View {
 
     var body: some View {
         VStack {
+            
             Button(action: {
-                switchReference()
+                refToggle.toggle()
             }) {
-                Text(reference).font(.title2).bold().foregroundStyle(Color.black)
+                Text(reference)
+                    .font(.title2)
+                    .bold()
+                    .foregroundColor(.black)
+                    .foregroundColor(.blue)
             }
         }
         .onAppear {
             sharedDataModel.fetchSavedData()
         }
-    }
-
-    func switchReference() {
-        refToggle.toggle()
     }
 
     private func formattedAadharNumber(_ aadharNum: String) -> String {
@@ -429,26 +463,22 @@ struct AadharNumberView: View {
 }
 
 
-
-
 struct ContentView: View {
     @StateObject private var sharedDataModel = SharedDataModel()
-    
 
     var body: some View {
         NavigationView {
             ZStack {
-                LinearGradient(gradient: Gradient(colors: [Color.orange, Color(hue: 1, saturation: 0.7, brightness: 1)]), startPoint: .bottomTrailing, endPoint: .trailing).ignoresSafeArea()
-                
+                LinearGradient(gradient: Gradient(colors: [Color.orange, Color(hue: 1, saturation: 0.7, brightness: 1)]), startPoint: .bottomTrailing, endPoint: .trailing)
+                    .ignoresSafeArea()
                 RoundedRectangle(cornerRadius: 10)
                     .foregroundColor(.white)
                     .opacity(0.7)
                     .padding(10.0)
                 VStack(alignment: .leading) {
-                    HStack{
+                    HStack {
                         Spacer()
                         AadharNumberView(sharedDataModel: sharedDataModel)
-
                         Spacer()
                     }
                     HStack(alignment: .top) {
@@ -458,13 +488,12 @@ struct ContentView: View {
                     }
                     AddressView(sharedDataModel: sharedDataModel)
                     Spacer()
-                    HStack{
+                    HStack {
                         LoadFileView(sharedDataModel: sharedDataModel)
-                        restView(sharedDataModel: sharedDataModel)
-                    }.padding(-10)
-                    
+                        ResetView(sharedDataModel: sharedDataModel)
+                    }
+                    .padding(-10)
                     .padding(10)
-
                 }
                 .padding(30)
                 .navigationTitle("Aadhar in Wallet")
