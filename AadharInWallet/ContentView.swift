@@ -255,6 +255,12 @@ struct NamesView: View {
     }
 }
 
+enum ViewPicker: Identifiable{
+    case reset
+    var id: Int{
+        hashValue
+    }
+}
 
 struct LoadFileView: View {
     @ObservedObject var sharedDataModel: SharedDataModel
@@ -262,41 +268,46 @@ struct LoadFileView: View {
     @State private var password: String = ""
     @State private var showAlert = false
     @State private var alertMessage = ""
+    @State private var ViewPicker: ViewPicker?
 
     var body: some View {
         VStack {
             Button(action: {
-                isDocumentPickerPresented.toggle()
-            }) {
-                Text("Load Zip File")
-                    .padding()
-                    .background(Color.black)
-                    .opacity(0.8)
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
-            }
-            .fileImporter(
-                isPresented: $isDocumentPickerPresented,
-                allowedContentTypes: [.archive],
-                allowsMultipleSelection: false
-            ) { result in
-                handleFileImport(result: result)
-            }
+                        isDocumentPickerPresented.toggle()
+                    }) {
+                        Text("Load Zip File")
+                            .padding()
+                            .background(Color.black.opacity(0.8))
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
+                    .fileImporter(
+                        isPresented: $isDocumentPickerPresented,
+                        allowedContentTypes: [.archive],
+                        allowsMultipleSelection: false
+                    ) { result in
+                        switch result {
+                        case .success(let files):
+                            files.forEach { file in
+                                let gotAccess = file.startAccessingSecurityScopedResource()
+                                if !gotAccess {return}
+                                requestPassword(for: file)
+                            }
+                        case .failure(let error):
+                            // Handle the error appropriately
+                            print("Failed to import file: \(error.localizedDescription)")
+                        }
+                    }
         }
         .alert(isPresented: $showAlert) {
             Alert(title: Text("Error"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
         }
     }
 
-    private func handleFileImport(result: Result<[URL], Error>) {
-        do {
-            let selectedFileURL = try result.get().first!
-            requestPassword(for: selectedFileURL)
-        } catch {
-            alertMessage = "Failed to load the file."
-            showAlert = true
-        }
-    }
+//    private func handleFileImport(fileloc: URL) {
+//        let selectedFileURL = fileloc
+//        requestPassword(for: selectedFileURL)
+//    }
 
     private func requestPassword(for fileURL: URL) {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
@@ -313,8 +324,7 @@ struct LoadFileView: View {
         }
         alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
             if let passwordField = alert.textFields?.first, let password = passwordField.text {
-                self.password = password
-                self.unzipFile(fileURL: fileURL, password: password)
+                unzipFile(fileURL: fileURL, password: password)
             }
         })
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
@@ -322,15 +332,70 @@ struct LoadFileView: View {
     }
 
     private func unzipFile(fileURL: URL, password: String) {
+        let destinationURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+
         do {
-            let destinationURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-            try Zip.unzipFile(fileURL, destination: destinationURL, overwrite: true, password: password)
-            processUnzippedFiles(at: destinationURL)
+            // Create the directory at destinationURL
+            try FileManager.default.createDirectory(at: destinationURL, withIntermediateDirectories: true, attributes: nil)
+            
+            // Check if the directory was created successfully
+            var isDirectory: ObjCBool = true
+            let directoryExists = FileManager.default.fileExists(atPath: destinationURL.path, isDirectory: &isDirectory)
+            
+            let folderPath = fileURL.deletingLastPathComponent()
+            print(folderPath)
+            do {
+                let items = try FileManager.default.contentsOfDirectory(atPath: Bundle.main.resourcePath!)
+
+                for item in items {
+                    print("Found \(item)")
+                }
+            } catch {
+                print("enum failed")
+            }
+            
+            
+            
+            if directoryExists && isDirectory.boolValue {
+                do {
+                    
+                    if FileManager.default.fileExists(atPath: fileURL.path(percentEncoded: false), isDirectory: nil) {
+                        print("File exists!")
+                        print(fileURL)
+                    } else {
+                        print("Nope")
+                        print(fileURL)
+                    }
+                    
+                    // Unzip the file to the created directory
+                    try Zip.unzipFile(fileURL, destination: destinationURL, overwrite: true, password: password)
+                    
+                    // Process the unzipped files
+                    processUnzippedFiles(at: destinationURL)
+                } catch let zipError as ZipError {
+                    // Handle specific ZipError cases
+                    switch zipError {
+                    case .fileNotFound:
+                        alertMessage = "File not found at path: \(fileURL)"
+                    case .unzipFail:
+                        alertMessage = "Failed to unzip the file. Possible reasons: corrupted zip, incorrect password."
+                    case .zipFail:
+                        alertMessage = "Failed to zip the file."
+                    }
+                    showAlert = true
+                }
+            } else {
+                alertMessage = "File not found at path v1: \(fileURL)"
+                showAlert = true
+            }
+            
         } catch {
-            alertMessage = "Failed to unzip the file: \(error.localizedDescription)"
+            // Handle any other errors that occur
+            alertMessage = "An error occurred: \(error.localizedDescription)\nURL: \(fileURL)\ndestination: \(destinationURL)"
             showAlert = true
         }
     }
+
 
     private func processUnzippedFiles(at destinationURL: URL) {
         do {
@@ -381,18 +446,23 @@ struct LoadFileView: View {
             if let firstField = alert.textFields?[0], let secondField = alert.textFields?[1], let thirdField = alert.textFields?[2],
                let firstPart = firstField.text, let secondPart = secondField.text, let thirdPart = thirdField.text {
                 let aadharNumber = firstPart + secondPart + thirdPart
-                if aadharNumber.count == 12 {
-                    if thirdPart == "\(sharedDataModel.kycData?.referenceId.prefix(4) ?? "")" {
-                        sharedDataModel.kycData?.aadharNum = aadharNumber
-                        UserDefaults.standard.set(aadharNumber, forKey: "aadharNum") // Save Aadhar number to UserDefaults
-                    } else {
-                        UserDefaults.standard.set("", forKey: "aadharNum")
-                        self.alertMessage = "Invalid Aadhar number. Last 4 digits do not match!"
-                        self.showAlert = true
-                    }
-                } else {
+                if firstPart.count != 4 || secondPart.count != 4 || thirdPart.count != 4 {
                     self.alertMessage = "Invalid Aadhar number. Please enter 12 digits."
                     self.showAlert = true
+                } else {
+                    if aadharNumber.count == 12 {
+                        if thirdPart == "\(sharedDataModel.kycData?.referenceId.prefix(4) ?? "")" {
+                            sharedDataModel.kycData?.aadharNum = aadharNumber
+                            UserDefaults.standard.set(aadharNumber, forKey: "aadharNum") // Save Aadhar number to UserDefaults
+                        } else {
+                            UserDefaults.standard.set("", forKey: "aadharNum")
+                            self.alertMessage = "Invalid Aadhar number. Last 4 digits do not match!"
+                            self.showAlert = true
+                        }
+                    } else {
+                        self.alertMessage = "Invalid Aadhar number. Please enter 12 digits."
+                        self.showAlert = true
+                    }
                 }
             }
         })
@@ -401,8 +471,6 @@ struct LoadFileView: View {
     }
 
 }
-
-
 
 struct ResetView: View {
     @ObservedObject var sharedDataModel: SharedDataModel
@@ -416,7 +484,6 @@ struct ResetView: View {
         }
     }
 }
-
 
 struct AadharNumberView: View {
     @ObservedObject var sharedDataModel: SharedDataModel
@@ -462,7 +529,6 @@ struct AadharNumberView: View {
     }
 }
 
-
 struct ContentView: View {
     @StateObject private var sharedDataModel = SharedDataModel()
 
@@ -497,8 +563,19 @@ struct ContentView: View {
                 }
                 .padding(30)
                 .navigationTitle("Aadhar in Wallet")
+                .navigationBarTitleTextColor(.black)
             }
-        }
+        }.foregroundColor(.black)
+    }
+}
+
+extension View {
+    @available(iOS 14, *)
+    func navigationBarTitleTextColor(_ color: Color) -> some View {
+        let uiColor = UIColor(color)
+        UINavigationBar.appearance().titleTextAttributes = [.foregroundColor: uiColor ]
+        UINavigationBar.appearance().largeTitleTextAttributes = [.foregroundColor: uiColor ]
+        return self
     }
 }
 
