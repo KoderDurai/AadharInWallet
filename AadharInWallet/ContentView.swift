@@ -182,6 +182,205 @@ class SharedDataModel: ObservableObject {
     }
 }
 
+struct SettingsView: View {
+    let value: Int
+    
+    init(value: Int) {
+        self.value = value
+    }
+    @StateObject var sharedDataModel = SharedDataModel()
+    @StateObject private var fileCoordinator = FileCoordinator(sharedDataModel: SharedDataModel())
+
+
+    var body: some View {
+        VStack {
+            List{
+                Button(action: {
+                    fileCoordinator.startFileImport()
+                }) {
+                    Label("Load Data", systemImage: "person.text.rectangle")
+                }
+                .accentColor(.green)
+                Button(action: {
+//                    sharedDataModel.resetData() No clue why this does not work!
+                    sharedDataModel.saveData(KYCData(id: "", referenceId: "", name: "", dob: "", gender: "", address: Address(careOf: "", country: "", district: "", house: "", landmark: "", locality: "", pincode: "", postOffice: "", state: "", street: "", subDistrict: "", vtc: ""), encodedImage: "", aadharNum: ""))
+                    
+                    fileCoordinator.alertMessage = "Reset Succesfully"
+                    fileCoordinator.showAlert = true
+                }) {
+                    Label("Reset", systemImage: "trash")
+                }
+                .accentColor(.red)
+            }
+            .listItemTint(.accentColor)
+            .navigationTitle("Settings")
+        }
+        .alert(isPresented: $fileCoordinator.showAlert) {
+            Alert(title: Text("Alert"), message: Text(fileCoordinator.alertMessage), dismissButton: .default(Text("OK")))
+        }
+        .fileImporter(
+            isPresented: $fileCoordinator.isDocumentPickerPresented,
+            allowedContentTypes: [.archive],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let files):
+                files.forEach { file in
+                    let gotAccess = file.startAccessingSecurityScopedResource()
+                    if !gotAccess { return }
+                    fileCoordinator.requestPassword(for: file)
+                }
+            case .failure(let error):
+                fileCoordinator.alertMessage = "Import Failed: \(error.localizedDescription)"
+                fileCoordinator.showAlert = true
+            }
+        }
+    }
+}
+
+class FileCoordinator: NSObject, ObservableObject {
+    @Published var showAlert = false
+    @Published var showAlert2 = false
+    @Published var alertMessage = ""
+    @Published var isDocumentPickerPresented = false
+    
+    private var sharedDataModel: SharedDataModel
+    
+    init(sharedDataModel: SharedDataModel) {
+        self.sharedDataModel = sharedDataModel
+    }
+    
+    func startFileImport() {
+        isDocumentPickerPresented = true
+    }
+    
+    func reset() {
+        print("trying to reset")
+        sharedDataModel.resetData()
+    }
+    
+    func requestPassword(for fileURL: URL) {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            alertMessage = "Unable to access the root view controller."
+            showAlert = true
+            return
+        }
+
+        let alert = UIAlertController(title: "Enter Password", message: "The zip file is protected. Please enter the password.", preferredStyle: .alert)
+        alert.addTextField { textField in
+            textField.placeholder = "Password"
+            textField.isSecureTextEntry = true
+        }
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            if let passwordField = alert.textFields?.first, let password = passwordField.text {
+                self.unzipFile(fileURL: fileURL, password: password)
+            }
+        })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in
+            self.alertMessage = "Operation cancelled by user."
+            self.showAlert = true
+        })
+        rootViewController.present(alert, animated: true)
+    }
+
+    private func unzipFile(fileURL: URL, password: String) {
+        let destinationURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+
+        do {
+            try FileManager.default.createDirectory(at: destinationURL, withIntermediateDirectories: true, attributes: nil)
+            try Zip.unzipFile(fileURL, destination: destinationURL, overwrite: true, password: password)
+            processUnzippedFiles(at: destinationURL)
+        } catch let zipError as ZipError {
+            switch zipError {
+            case .fileNotFound:
+                alertMessage = "File not found at path: \(fileURL)"
+            case .unzipFail:
+                alertMessage = "Failed to unzip the file. Possible reasons: corrupted zip, incorrect password."
+            case .zipFail:
+                alertMessage = "Failed to zip the file."
+            }
+            showAlert = true
+        } catch {
+            alertMessage = "An error occurred: \(error.localizedDescription)\nURL: \(fileURL)\ndestination: \(destinationURL)"
+            showAlert = true
+        }
+    }
+
+    private func processUnzippedFiles(at destinationURL: URL) {
+        do {
+            let contents = try FileManager.default.contentsOfDirectory(at: destinationURL, includingPropertiesForKeys: nil)
+            if let xmlFile = contents.first(where: { $0.pathExtension == "xml" }) {
+                let xmlData = try Data(contentsOf: xmlFile)
+                if let kycData = KYCParser().parse(data: xmlData) {
+                    sharedDataModel.saveData(kycData)
+                    requestAadharNumber()
+                } else {
+                    alertMessage = "Failed to parse the XML file."
+                    showAlert = true
+                }
+            } else {
+                alertMessage = "No XML file found in the unzipped contents."
+                showAlert = true
+            }
+        } catch {
+            alertMessage = "Failed to process the unzipped files: \(error.localizedDescription)"
+            showAlert = true
+        }
+    }
+
+    private func requestAadharNumber() {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            alertMessage = "Unable to access the root view controller."
+            showAlert = true
+            return
+        }
+
+        let alert = UIAlertController(title: "Enter Aadhar Number", message: "Please enter the 12-digit Aadhar number.", preferredStyle: .alert)
+        
+        alert.addTextField { textField in
+            textField.placeholder = "XXXX"
+            textField.keyboardType = .numberPad
+        }
+        alert.addTextField { textField in
+            textField.placeholder = "XXXX"
+            textField.keyboardType = .numberPad
+        }
+        alert.addTextField { textField in
+            textField.placeholder = "XXXX"
+            textField.keyboardType = .numberPad
+        }
+        
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            if let firstField = alert.textFields?[0], let secondField = alert.textFields?[1], let thirdField = alert.textFields?[2],
+               let firstPart = firstField.text, let secondPart = secondField.text, let thirdPart = thirdField.text {
+                let aadharNumber = firstPart + secondPart + thirdPart
+                if firstPart.count != 4 || secondPart.count != 4 || thirdPart.count != 4 {
+                    self.alertMessage = "Invalid Aadhar number. Please enter 12 digits."
+                    self.showAlert = true
+                } else {
+                    if aadharNumber.count == 12 {
+                        if thirdPart == "\(self.sharedDataModel.kycData?.referenceId.prefix(4) ?? "")" {
+                            self.sharedDataModel.kycData?.aadharNum = aadharNumber
+                            UserDefaults.standard.set(aadharNumber, forKey: "aadharNum")
+                        } else {
+                            UserDefaults.standard.set("", forKey: "aadharNum")
+                            self.alertMessage = "Invalid Aadhar number. Last 4 digits do not match!"
+                            self.showAlert = true
+                        }
+                    } else {
+                        self.alertMessage = "Invalid Aadhar number. Please enter 12 digits."
+                        self.showAlert = true
+                    }
+                }
+            }
+        })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        rootViewController.present(alert, animated: true)
+    }
+}
+
 
 struct PictureView: View {
     @ObservedObject var sharedDataModel: SharedDataModel
@@ -294,7 +493,8 @@ struct LoadFileView: View {
                                 requestPassword(for: file)
                             }
                         case .failure(let error):
-                            // Handle the error appropriately
+                            alertMessage = "Import Failed"
+                            showAlert = true
                             print("Failed to import file: \(error.localizedDescription)")
                         }
                     }
@@ -530,10 +730,10 @@ struct AadharNumberView: View {
 }
 
 struct ContentView: View {
-    @StateObject private var sharedDataModel = SharedDataModel()
+    @StateObject var sharedDataModel = SharedDataModel()
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 LinearGradient(gradient: Gradient(colors: [Color.orange, Color(hue: 1, saturation: 0.7, brightness: 1)]), startPoint: .bottomTrailing, endPoint: .trailing)
                     .ignoresSafeArea()
@@ -555,17 +755,25 @@ struct ContentView: View {
                     AddressView(sharedDataModel: sharedDataModel)
                     Spacer()
                     HStack {
-                        LoadFileView(sharedDataModel: sharedDataModel)
-                        ResetView(sharedDataModel: sharedDataModel)
+//                        LoadFileView(sharedDataModel: sharedDataModel)
+//                        ResetView(sharedDataModel: sharedDataModel)
+                        NavigationLink(value: 1) {
+                            Label("Settings", systemImage: "gear")
+                        }
                     }
                     .padding(-10)
                     .padding(10)
                 }
                 .padding(30)
-                .navigationTitle("Aadhar in Wallet")
-                .navigationBarTitleTextColor(.black)
+                .foregroundColor(.black)
+                
             }
-        }.foregroundColor(.black)
+            .navigationTitle("Aadhar in Wallet")
+            .navigationDestination(for: Int.self) {
+                value in SettingsView(value: value)
+            }
+            //.navigationBarTitleTextColor(.black)
+        }
     }
 }
 
