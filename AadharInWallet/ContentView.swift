@@ -212,7 +212,8 @@ struct SettingsView: View {
                 }
                 .accentColor(.red)
             }
-            
+            .listItemTint(.accentColor)
+            .navigationTitle("Settings")
         }
         .alert(isPresented: $fileCoordinator.showAlert) {
             Alert(title: Text("Alert"), message: Text(fileCoordinator.alertMessage), dismissButton: .default(Text("OK")))
