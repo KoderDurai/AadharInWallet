@@ -397,7 +397,7 @@ struct PictureView: View {
                 ZStack{
                     RoundedRectangle(cornerRadius: 5)
                         .foregroundColor(.gray)
-                    Text("Aadhar card file corrupted, or not available. Try again. ").padding(10)
+                    Text("Load aadhar card").padding(10)
                 }
                 
                 
@@ -429,7 +429,7 @@ struct AddressView: View {
                 Text("\(address.careOf), \(address.house), \(address.street)")
                 Text("\(address.landmark), \(address.locality), \(address.vtc)")
                 Text("\(address.district), \(address.state), \(address.country)")
-                Text("Pincode: \(address.pincode)")
+                Text("\(address.pincode)")
             }
         }
     }
@@ -729,45 +729,57 @@ struct AadharNumberView: View {
     }
 }
 
+struct CardView: View {
+    @ObservedObject var sharedDataModel: SharedDataModel
+    @Environment(\.colorScheme) var colorScheme
+    private var shadowColor: Color {
+            return colorScheme == .light ? .gray : .gray
+        }
+    
+    var body: some View {
+        ZStack {
+            LinearGradient(gradient: Gradient(colors: [Color.green, Color.white, Color.white, Color.orange]), startPoint: .bottom, endPoint: .top)
+            VStack(alignment: .leading){
+                HStack(alignment: .top) {
+                    PictureView(sharedDataModel: sharedDataModel)
+                        .cornerRadius(5)
+                    NamesView(sharedDataModel: sharedDataModel)
+                }
+                HStack {
+                    Spacer()
+                    AadharNumberView(sharedDataModel: sharedDataModel)
+                    Spacer()
+                }
+            }.padding(10)
+        }
+        .frame(height: 275)
+        .cornerRadius(5)
+        .foregroundColor(.black)
+        .shadow(color: shadowColor, radius: 20, x:0, y:15)
+
+    }
+}
+
 struct ContentView: View {
     @StateObject var sharedDataModel = SharedDataModel()
 
     var body: some View {
         NavigationStack {
             ZStack {
-                LinearGradient(gradient: Gradient(colors: [Color.orange, Color(hue: 1, saturation: 0.7, brightness: 1)]), startPoint: .bottomTrailing, endPoint: .trailing)
-                    .ignoresSafeArea()
-                RoundedRectangle(cornerRadius: 10)
-                    .foregroundColor(.white)
-                    .opacity(0.7)
-                    .padding(10.0)
+//                LinearGradient(gradient: Gradient(colors: [Color.orange, Color(hue: 1, saturation: 0.7, brightness: 1)]), startPoint: .bottomTrailing, endPoint: .trailing)
+//                    .ignoresSafeArea()
                 VStack(alignment: .leading) {
-                    HStack {
-                        Spacer()
-                        AadharNumberView(sharedDataModel: sharedDataModel)
-                        Spacer()
-                    }
-                    HStack(alignment: .top) {
-                        PictureView(sharedDataModel: sharedDataModel)
-                            .cornerRadius(5)
-                        NamesView(sharedDataModel: sharedDataModel)
-                    }
-                    AddressView(sharedDataModel: sharedDataModel)
+                    CardView(sharedDataModel: sharedDataModel)
+                    AddressView(sharedDataModel: sharedDataModel).padding(10)
                     Spacer()
                     HStack {
-//                        LoadFileView(sharedDataModel: sharedDataModel)
-//                        ResetView(sharedDataModel: sharedDataModel)
                         NavigationLink(value: 1) {
                             Label("Settings", systemImage: "gear")
                         }
                     }
-                    .padding(-10)
-                    .padding(10)
                 }
-                .padding(30)
-                .foregroundColor(.black)
-                
             }
+            .padding(10)
             .navigationTitle("Aadhar in Wallet")
             .navigationDestination(for: Int.self) {
                 value in SettingsView(value: value)
