@@ -10,7 +10,7 @@ Welcome to the **Aadhar in Wallet** project! This iOS application offers a seaml
 
 You can download the **Aadhar in Wallet** app via TestFlight. Click the link below to get started:
 
-[![TestFlight](https://testflight.apple.com/join/BSHcqyIx)
+[![TestFlight](https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg)](https://testflight.apple.com/join/BSHcqyIx)
 
 ## **💡 Features**
 
