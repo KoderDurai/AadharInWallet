@@ -6,9 +6,12 @@ import Foundation
 struct KYCData: Identifiable {
     var id: String // This is for Identifiable protocol
     var referenceId: String // New property for the reference ID
+    var hashLayer: Int
     var name: String
     var dob: String
     var gender: String
+    var email: String
+    var mob: String
     var address: Address
     var encodedImage: String
     var aadharNum: String
@@ -51,9 +54,12 @@ class KYCParser: NSObject, XMLParserDelegate {
             kycData = KYCData(
                 id: referenceId, // Use referenceId for the id property
                 referenceId: referenceId,
+                hashLayer: (Int(String(referenceId[referenceId.index(referenceId.startIndex, offsetBy: 3)])) == 0) ? 1 : (Int(String(referenceId[referenceId.index(referenceId.startIndex, offsetBy: 3)])) ?? 1),
                 name: "",
                 dob: "",
                 gender: "",
+                email: "",
+                mob: "",
                 address: Address(careOf: "", country: "", district: "", house: "", landmark: "", locality: "", pincode: "", postOffice: "", state: "", street: "", subDistrict: "", vtc: ""),
                 encodedImage: "", aadharNum: ""
             )
@@ -61,6 +67,8 @@ class KYCParser: NSObject, XMLParserDelegate {
             kycData?.name = attributeDict["name"] ?? ""
             kycData?.dob = attributeDict["dob"] ?? ""
             kycData?.gender = attributeDict["gender"] ?? ""
+            kycData?.email = attributeDict["email"] ?? ""
+            kycData?.mob = attributeDict["mob"] ?? ""
         } else if elementName == "Poa" {
             address = Address(
                 careOf: attributeDict["careof"] ?? "",
@@ -93,8 +101,11 @@ class SharedDataModel: ObservableObject {
     func saveData(_ data: KYCData) {
         self.kycData = data
         UserDefaults.standard.set(data.referenceId, forKey: "referenceId")
+        UserDefaults.standard.set(data.hashLayer, forKey: "hashLayer")
         UserDefaults.standard.set(data.name, forKey: "name")
         UserDefaults.standard.set(data.gender, forKey: "gender")
+        UserDefaults.standard.set(data.email, forKey: "email")
+        UserDefaults.standard.set(data.mob, forKey: "mob")
         UserDefaults.standard.set(data.dob, forKey: "dob")
         UserDefaults.standard.set(data.address.careOf, forKey: "careof")
         UserDefaults.standard.set(data.address.country, forKey: "country")
@@ -113,8 +124,11 @@ class SharedDataModel: ObservableObject {
 
     func fetchSavedData() {
         let referenceId = UserDefaults.standard.string(forKey: "referenceId") ?? ""
+        let hashLayer = UserDefaults.standard.integer(forKey: "hashLayer")
         let name = UserDefaults.standard.string(forKey: "name") ?? ""
         let gender = UserDefaults.standard.string(forKey: "gender") ?? ""
+        let email = UserDefaults.standard.string(forKey: "email") ?? ""
+        let mob = UserDefaults.standard.string(forKey: "mob") ?? ""
         let dob = UserDefaults.standard.string(forKey: "dob") ?? ""
         let careof = UserDefaults.standard.string(forKey: "careof") ?? ""
         let country = UserDefaults.standard.string(forKey: "country") ?? ""
@@ -133,9 +147,12 @@ class SharedDataModel: ObservableObject {
         self.kycData = KYCData(
             id: referenceId,
             referenceId: referenceId,
+            hashLayer: hashLayer,
             name: name,
             dob: dob,
             gender: gender,
+            email: email,
+            mob: mob,
             address: Address(
                 careOf: careof,
                 country: country,
@@ -159,9 +176,12 @@ class SharedDataModel: ObservableObject {
         self.kycData = KYCData(
             id: "",
             referenceId: "",
+            hashLayer: 1,
             name: "",
             dob: "",
             gender: "",
+            email: "",
+            mob: "",
             address: Address(
                 careOf: "",
                 country: "",
@@ -183,34 +203,59 @@ class SharedDataModel: ObservableObject {
 }
 
 struct SettingsView: View {
-    let value: Int
-    
-    init(value: Int) {
-        self.value = value
-    }
+
     @StateObject var sharedDataModel = SharedDataModel()
     @StateObject private var fileCoordinator = FileCoordinator(sharedDataModel: SharedDataModel())
+    @State private var showingFAQSheet = false
+    @State private var showingAboutMeSheet = false
 
 
     var body: some View {
         VStack {
             List{
-                Button(action: {
-                    fileCoordinator.startFileImport()
-                }) {
-                    Label("Load Data", systemImage: "person.text.rectangle")
+                Section {
+                    Button(action: {
+                        fileCoordinator.startFileImport()
+                    }) {
+                        Label("Load Data", systemImage: "person.text.rectangle")
+                    }
+                    .accentColor(.green)
+                    Button(action: {
+                        //sharedDataModel.resetData() No clue why this does not work!
+                        sharedDataModel.saveData(KYCData(id: "", referenceId: "", hashLayer: 1, name: "", dob: "", gender: "", email: "", mob:"", address: Address(careOf: "", country: "", district: "", house: "", landmark: "", locality: "", pincode: "", postOffice: "", state: "", street: "", subDistrict: "", vtc: ""), encodedImage: "", aadharNum: ""))
+                        
+                        fileCoordinator.alertMessage = "Reset Succesfully"
+                        fileCoordinator.showAlert = true
+                    }) {
+                        Label("Reset", systemImage: "trash")
+                    }
+                    .accentColor(.red)
+                } header: {
+                    Text("Data")
                 }
-                .accentColor(.green)
-                Button(action: {
-//                    sharedDataModel.resetData() No clue why this does not work!
-                    sharedDataModel.saveData(KYCData(id: "", referenceId: "", name: "", dob: "", gender: "", address: Address(careOf: "", country: "", district: "", house: "", landmark: "", locality: "", pincode: "", postOffice: "", state: "", street: "", subDistrict: "", vtc: ""), encodedImage: "", aadharNum: ""))
-                    
-                    fileCoordinator.alertMessage = "Reset Succesfully"
-                    fileCoordinator.showAlert = true
-                }) {
-                    Label("Reset", systemImage: "trash")
+                Section {
+                    Button("FAQ") {
+                        showingFAQSheet.toggle()
+                            }
+                            .sheet(isPresented: $showingFAQSheet) {
+                                NavigationStack {
+                                    faqView()
+                                }
+                            }
+                    Button("About the developer") {
+                        showingAboutMeSheet.toggle()
+                            }
+                            .sheet(isPresented: $showingAboutMeSheet) {
+                                NavigationStack {
+                                    aboutMeSheet()
+                                }
+                            }
+                } header: {
+                    Text("FAQ")
                 }
-                .accentColor(.red)
+
+
+                
             }
             .listItemTint(.accentColor)
             .navigationTitle("Settings")
@@ -381,6 +426,27 @@ class FileCoordinator: NSObject, ObservableObject {
     }
 }
 
+struct faqView: View {
+    var body: some View {
+        VStack(alignment: .leading) {
+            Text("Where to download your Aadhar Card xml file from?")
+                .font(.headline)
+                .padding(.bottom, 5)
+            Text("Visit [UIDAI](https://uidai.gov.in/en/307-english-uk/faqs/aadhaar-online-services/aadhaar-paperless-offline-e-kyc/10731-how-to-generate-offline-aadhaar-2.html) for latest instructions")
+                .padding(.bottom, 5)
+            Image("faqSS")
+                .resizable() // Assuming you want the image to be resizable
+                .aspectRatio(contentMode: .fit) // Assuming you want to maintain aspect ratio
+                .padding(.bottom, 5)
+            Text("Once downloaded, Load Data via Settings in this app. Use the same phase phrase")
+                .padding(.bottom, 5)
+            Spacer()
+        }
+        .padding(10.0)
+        .navigationTitle("How to download")
+    }
+}
+
 
 struct PictureView: View {
     @ObservedObject var sharedDataModel: SharedDataModel
@@ -389,15 +455,17 @@ struct PictureView: View {
         VStack {
             if let image = decodeBase64String(sharedDataModel.kycData?.encodedImage ?? "") {
                 Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
+                    //.resizable()
+                    .frame(width: 160.0, height: 200.0)
+                    //.scaledToFit()
 
             } else {
                 Spacer()
                 ZStack{
                     RoundedRectangle(cornerRadius: 5)
                         .foregroundColor(.gray)
-                    Text("Aadhar card file corrupted, or not available. Try again. ").padding(10)
+                        .frame(width: 160.0, height: 200.0)
+                    Text("Load aadhar card").padding(10)
                 }
                 
                 
@@ -421,15 +489,22 @@ struct PictureView: View {
 
 struct AddressView: View {
     @ObservedObject var sharedDataModel: SharedDataModel
+    
+    
 
     var body: some View {
-        if let address = sharedDataModel.kycData?.address {
+        if let address = sharedDataModel.kycData?.address, !address.careOf.isEmpty {
             VStack(alignment: .leading) {
                 Text("Address").font(.subheadline)
                 Text("\(address.careOf), \(address.house), \(address.street)")
                 Text("\(address.landmark), \(address.locality), \(address.vtc)")
                 Text("\(address.district), \(address.state), \(address.country)")
-                Text("Pincode: \(address.pincode)")
+                Text("\(address.pincode)")
+            }
+        } else {
+            VStack(alignment: .leading) {
+                Text("Address").font(.subheadline)
+                Text("Not loaded")
             }
         }
     }
@@ -504,10 +579,6 @@ struct LoadFileView: View {
         }
     }
 
-//    private func handleFileImport(fileloc: URL) {
-//        let selectedFileURL = fileloc
-//        requestPassword(for: selectedFileURL)
-//    }
 
     private func requestPassword(for fileURL: URL) {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
@@ -729,49 +800,61 @@ struct AadharNumberView: View {
     }
 }
 
+struct CardView: View {
+    @ObservedObject var sharedDataModel: SharedDataModel
+    @Environment(\.colorScheme) var colorScheme
+        private var shadowColor: Color {
+                return colorScheme == .light ? .gray : .gray
+            }
+    private let greenColor = Color(red: 162/255, green: 250/255, blue: 186/255)
+    private let orangeColor = Color(red: 255/255, green: 179/255, blue: 112/255)
+    var body: some View {
+        ZStack {
+            LinearGradient(gradient: Gradient(colors: [greenColor, Color.white, Color.white, orangeColor]), startPoint: .bottom, endPoint: .top)
+            VStack(alignment: .leading){
+                HStack(alignment: .top) {
+                    PictureView(sharedDataModel: sharedDataModel)
+                        .cornerRadius(5)
+                    NamesView(sharedDataModel: sharedDataModel)
+                }
+                HStack {
+                    Spacer()
+                    AadharNumberView(sharedDataModel: sharedDataModel)
+                    Spacer()
+                }
+            }.padding(10)
+        }
+        .frame(height: 275)
+        .cornerRadius(5)
+        .foregroundColor(.black)
+        .shadow(color: shadowColor, radius: 20, x:0, y:15)
+
+    }
+}
+
 struct ContentView: View {
     @StateObject var sharedDataModel = SharedDataModel()
 
     var body: some View {
         NavigationStack {
             ZStack {
-                LinearGradient(gradient: Gradient(colors: [Color.orange, Color(hue: 1, saturation: 0.7, brightness: 1)]), startPoint: .bottomTrailing, endPoint: .trailing)
-                    .ignoresSafeArea()
-                RoundedRectangle(cornerRadius: 10)
-                    .foregroundColor(.white)
-                    .opacity(0.7)
-                    .padding(10.0)
+//                LinearGradient(gradient: Gradient(colors: [Color.orange, Color(hue: 1, saturation: 0.7, brightness: 1)]), startPoint: .bottomTrailing, endPoint: .trailing)
+//                    .ignoresSafeArea()
                 VStack(alignment: .leading) {
-                    HStack {
-                        Spacer()
-                        AadharNumberView(sharedDataModel: sharedDataModel)
-                        Spacer()
-                    }
-                    HStack(alignment: .top) {
-                        PictureView(sharedDataModel: sharedDataModel)
-                            .cornerRadius(5)
-                        NamesView(sharedDataModel: sharedDataModel)
-                    }
-                    AddressView(sharedDataModel: sharedDataModel)
+                    CardView(sharedDataModel: sharedDataModel)
+                    AddressView(sharedDataModel: sharedDataModel).padding(10)
                     Spacer()
                     HStack {
-//                        LoadFileView(sharedDataModel: sharedDataModel)
-//                        ResetView(sharedDataModel: sharedDataModel)
-                        NavigationLink(value: 1) {
+                        NavigationLink {
+                            SettingsView()
+                        } label: {
                             Label("Settings", systemImage: "gear")
                         }
                     }
-                    .padding(-10)
-                    .padding(10)
                 }
-                .padding(30)
-                .foregroundColor(.black)
-                
             }
-            .navigationTitle("Aadhar in Wallet")
-            .navigationDestination(for: Int.self) {
-                value in SettingsView(value: value)
-            }
+            .padding(10)
+            .navigationTitle("MyAadhar")
             //.navigationBarTitleTextColor(.black)
         }
     }
@@ -790,5 +873,7 @@ extension View {
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
+//        faqView()
     }
 }
+
