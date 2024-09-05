@@ -456,7 +456,7 @@ struct PictureView: View {
             if let image = decodeBase64String(sharedDataModel.kycData?.encodedImage ?? "") {
                 Image(uiImage: image)
                     //.resizable()
-                    .frame(width: 160.0, height: 200.0)
+                    .frame(height: 175)
                     //.scaledToFit()
 
             } else {
@@ -464,7 +464,7 @@ struct PictureView: View {
                 ZStack{
                     RoundedRectangle(cornerRadius: 5)
                         .foregroundColor(.gray)
-                        .frame(width: 160.0, height: 200.0)
+                        .frame(width: 150, height: 175)
                     Text("Load aadhar card").padding(10)
                 }
                 
@@ -812,6 +812,24 @@ struct CardView: View {
         ZStack {
             LinearGradient(gradient: Gradient(colors: [greenColor, Color.white, Color.white, orangeColor]), startPoint: .bottom, endPoint: .top)
             VStack(alignment: .leading){
+                HStack {
+                    Image("emblem")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 35)
+                    Spacer(minLength: 50)
+                    
+                    Image("GoI")
+                        .resizable()
+                        .scaledToFit()
+
+
+                    Image("Aadhaar_Logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 35)
+                        
+                }
                 HStack(alignment: .top) {
                     PictureView(sharedDataModel: sharedDataModel)
                         .cornerRadius(5)
@@ -824,7 +842,7 @@ struct CardView: View {
                 }
             }.padding(10)
         }
-        .frame(height: 275)
+        .frame(height: 300)
         .cornerRadius(5)
         .foregroundColor(.black)
         .shadow(color: shadowColor, radius: 20, x:0, y:15)
@@ -838,8 +856,6 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-//                LinearGradient(gradient: Gradient(colors: [Color.orange, Color(hue: 1, saturation: 0.7, brightness: 1)]), startPoint: .bottomTrailing, endPoint: .trailing)
-//                    .ignoresSafeArea()
                 VStack(alignment: .leading) {
                     CardView(sharedDataModel: sharedDataModel)
                     AddressView(sharedDataModel: sharedDataModel).padding(10)
@@ -854,7 +870,7 @@ struct ContentView: View {
                 }
             }
             .padding(10)
-            .navigationTitle("MyAadhar")
+            .navigationTitle("MyAadhaar")
             //.navigationBarTitleTextColor(.black)
         }
     }
