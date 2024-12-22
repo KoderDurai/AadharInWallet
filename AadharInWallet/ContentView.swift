@@ -438,7 +438,7 @@ struct faqView: View {
                 .resizable() // Assuming you want the image to be resizable
                 .aspectRatio(contentMode: .fit) // Assuming you want to maintain aspect ratio
                 .padding(.bottom, 5)
-            Text("Once downloaded, Load Data via Settings in this app. Use the same phase phrase")
+            Text("Once downloaded, Load Data via Settings in this app. Use the same pass phrase as password")
                 .padding(.bottom, 5)
             Spacer()
         }
@@ -465,7 +465,7 @@ struct PictureView: View {
                     RoundedRectangle(cornerRadius: 5)
                         .foregroundColor(.gray)
                         .frame(width: 150, height: 175)
-                    Text("Load aadhar card").padding(10)
+                    Text("Load Aadhaar card").padding(10)
                 }
                 
                 
@@ -667,7 +667,6 @@ struct LoadFileView: View {
         }
     }
 
-
     private func processUnzippedFiles(at destinationURL: URL) {
         do {
             let contents = try FileManager.default.contentsOfDirectory(at: destinationURL, includingPropertiesForKeys: nil)
@@ -759,34 +758,59 @@ struct ResetView: View {
 struct AadharNumberView: View {
     @ObservedObject var sharedDataModel: SharedDataModel
     @State private var refToggle = false
-
+    @State private var aadharNumCopyToggle:Bool = false
+    
     var reference: String {
-        if let aadharNum = sharedDataModel.kycData?.aadharNum {
-            return refToggle ? (aadharNum.isEmpty ? "Aadhar number not loaded yet" : formattedAadharNumber(aadharNum)) :
-                "XXXX XXXX \(sharedDataModel.kycData?.referenceId.prefix(4) ?? "XXXX")"
-        } else {
-            return "No aadhar card number loaded"
-        }
+        let aadharNum = sharedDataModel.kycData?.aadharNum ?? ""
+        let referenceId = sharedDataModel.kycData?.referenceId ?? ""
+        
+        return refToggle
+        ? (aadharNum.isEmpty ? "XXXX XXXX XXXX" : formattedAadharNumber(aadharNum))
+        : "XXXX XXXX \(referenceId.isEmpty ? "XXXX" : referenceId.prefix(4))"
     }
-
     var body: some View {
         VStack {
             
-            Button(action: {
-                refToggle.toggle()
-            }) {
-                Text(reference)
-                    .font(.title2)
-                    .bold()
-                    .foregroundColor(.black)
-                    .foregroundColor(.blue)
-            }
+            Text(reference)
+                .font(.title2)
+                .bold()
+                .foregroundColor(.black)
         }
+        .monospaced()
         .onAppear {
             sharedDataModel.fetchSavedData()
         }
+        .onTapGesture {
+            refToggle.toggle()
+        }
+        
+        // Long-press gesture for copying Aadhaar number
+        .onLongPressGesture()
+        {
+            let aadharNum = sharedDataModel.kycData?.aadharNum ?? ""
+            if !aadharNum.isEmpty && refToggle{
+                // Copy Aadhaar number to clipboard
+                UIPasteboard.general.string = aadharNum
+                
+                // Toggle state to indicate copied
+                aadharNumCopyToggle = true
+                
+                // Reset toggle after 2 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2){
+                    aadharNumCopyToggle = false
+                }
+            }
+        }
+        // Haptics when copystate is induced
+        .sensoryFeedback(.success, trigger: aadharNumCopyToggle)
+        .alert(isPresented: $aadharNumCopyToggle) {
+            Alert(
+                title: Text("Copied!"),
+                message: Text("Aadhaar number copied to clipboard.")
+            )
+        }
     }
-
+}
     private func formattedAadharNumber(_ aadharNum: String) -> String {
         var formattedString = ""
         for (index, char) in aadharNum.enumerated() {
@@ -798,7 +822,6 @@ struct AadharNumberView: View {
         }
         return formattedString
     }
-}
 
 struct CardView: View {
     @ObservedObject var sharedDataModel: SharedDataModel
@@ -852,9 +875,10 @@ struct CardView: View {
 
 struct ContentView: View {
     @StateObject var sharedDataModel = SharedDataModel()
+    @State var navigationPath = NavigationPath()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ZStack {
                 VStack(alignment: .leading) {
                     CardView(sharedDataModel: sharedDataModel)
