@@ -810,7 +810,7 @@ struct AadharNumberView: View {
             )
         }
     }
-}
+    
     private func formattedAadharNumber(_ aadharNum: String) -> String {
         var formattedString = ""
         for (index, char) in aadharNum.enumerated() {
@@ -822,6 +822,7 @@ struct AadharNumberView: View {
         }
         return formattedString
     }
+}
 
 struct CardView: View {
     @ObservedObject var sharedDataModel: SharedDataModel
